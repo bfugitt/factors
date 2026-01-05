@@ -113,7 +113,7 @@
                 </div>
             </div>
             <div class="hud-bar bottom-bar">
-                ARROWS to Move &nbsp;&bullet;&nbsp; SPACE to Munch &nbsp;&bullet;&nbsp; Avoid Troggles!
+                ARROWS to Move &nbsp;&bullet;&nbsp; SPACE to Munch &nbsp;&bullet;&nbsp; 'H' for Hint
             </div>
         </div>
 
@@ -368,6 +368,16 @@
                         this.setupLevel();
                     }, 1000);
                 }
+            },
+
+            hint: function() {
+                // Find all valid, uneaten cells
+                const targets = this.grid.filter(c => c.isValid && !c.eaten);
+                if (targets.length > 0) {
+                    // Pick random one to flash
+                    const t = targets[Math.floor(Math.random() * targets.length)];
+                    t.highlightTimer = 60; // Flash for ~1 second (60 frames)
+                }
             }
         };
 
@@ -393,6 +403,10 @@
                     break;
                 case ' ':
                     munch();
+                    break;
+                case 'h':
+                case 'H':
+                    Game.hint();
                     break;
             }
         });
@@ -459,7 +473,21 @@
                 if (!cell.eaten) {
                     const cx = cell.c * CELL_W + (CELL_W/2);
                     const cy = cell.r * CELL_H + (CELL_H/2) + TOP_OFFSET;
-                    ctx.fillStyle = cell.color;
+                    
+                    if (cell.highlightTimer > 0) {
+                        // Flash effect
+                        ctx.save();
+                        ctx.fillStyle = '#fff';
+                        ctx.globalAlpha = 0.3; // Semi-transparent white box
+                        ctx.fillRect(cell.c * CELL_W, cell.r * CELL_H + TOP_OFFSET, CELL_W, CELL_H);
+                        ctx.restore();
+                        
+                        cell.highlightTimer--;
+                        ctx.fillStyle = '#fff'; // Text becomes bright white
+                    } else {
+                        ctx.fillStyle = cell.color;
+                    }
+                    
                     ctx.fillText(cell.val, cx, cy);
                 }
             });
