@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Math Muncher: 4th Grade Edition</title>
+    <title>Math Munchers: Arcade Edition</title>
     <style>
-        /* RETRO STYLING */
         body {
-            background-color: #1a1a1a;
-            color: #33ff00;
+            background-color: #111;
+            color: #eee;
             font-family: 'Courier New', Courier, monospace;
             display: flex;
             flex-direction: column;
@@ -17,375 +16,617 @@
             height: 100vh;
             margin: 0;
             overflow: hidden;
+            user-select: none;
         }
 
         #game-container {
-            border: 4px solid #33ff00;
-            padding: 20px;
-            background-color: #000;
-            box-shadow: 0 0 20px rgba(51, 255, 0, 0.2);
-            text-align: center;
+            position: relative;
+            box-shadow: 0 0 40px rgba(0, 255, 0, 0.1);
+            border: 4px solid #444;
+            border-radius: 10px;
+            background: #000;
         }
 
-        h1 { margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 2px; }
-        
-        #hud {
+        canvas {
+            display: block;
+            background-color: #000;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .hud-bar {
+            background: rgba(0, 20, 0, 0.8);
+            color: #0f0;
+            padding: 10px;
             display: flex;
             justify-content: space-between;
-            width: 500px;
-            margin-bottom: 10px;
-            font-weight: bold;
-            font-size: 18px;
-        }
-
-        #instruction-box {
-            background-color: #33ff00;
-            color: black;
-            padding: 5px;
-            margin-bottom: 15px;
-            font-weight: bold;
-        }
-
-        /* GRID SYSTEM */
-        #grid {
-            display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            gap: 5px;
-            width: 500px;
-            height: 400px;
-            margin: 0 auto;
-        }
-
-        .cell {
-            background-color: #002200;
-            border: 1px solid #004400;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             font-size: 20px;
-            cursor: pointer;
-            position: relative;
-        }
-
-        /* THE MUNCHER (PLAYER) */
-        .player {
-            background-color: #33ff00 !important;
-            color: black !important;
-            border: 2px solid white !important;
             font-weight: bold;
-            box-shadow: 0 0 10px #33ff00;
+            border-bottom: 2px solid #0f0;
+            text-transform: uppercase;
+            text-shadow: 0 0 5px #0f0;
         }
 
-        /* ANIMATIONS */
-        .eaten { visibility: hidden; }
-        
-        .correct-flash { animation: flashGreen 0.2s; }
-        .wrong-flash { animation: flashRed 0.4s; }
-
-        @keyframes flashGreen {
-            0% { background-color: white; }
-            100% { background-color: #002200; }
-        }
-        @keyframes flashRed {
-            0% { background-color: red; }
-            50% { background-color: red; }
-            100% { background-color: #002200; }
+        .bottom-bar {
+            border-top: 2px solid #0f0;
+            border-bottom: none;
+            font-size: 14px;
+            justify-content: center;
         }
 
-        #controls { margin-top: 15px; font-size: 14px; color: #88ff88; }
-        
-        /* MENU STYLES */
-        button {
-            background: black;
-            color: #33ff00;
-            border: 2px solid #33ff00;
-            padding: 10px 20px;
-            font-family: inherit;
-            font-size: 18px;
-            cursor: pointer;
-            margin: 5px;
-        }
-        button:hover { background: #33ff00; color: black; }
-
-        #game-over, #menu {
+        /* MENUS */
+        .overlay {
             position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.9);
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.9);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            pointer-events: auto;
             z-index: 10;
         }
+
         .hidden { display: none !important; }
+
+        h1 { font-size: 48px; color: #0f0; text-shadow: 4px 4px 0 #004400; margin-bottom: 20px; }
+        h2 { font-size: 32px; color: #fff; margin-bottom: 10px; }
+        p { color: #ccc; font-size: 18px; max-width: 600px; text-align: center; margin-bottom: 30px; }
+
+        button {
+            background: #000;
+            color: #0f0;
+            border: 3px solid #0f0;
+            padding: 15px 30px;
+            font-family: inherit;
+            font-size: 24px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+        button:hover { background: #0f0; color: #000; box-shadow: 0 0 15px #0f0; }
+
+        .lives-display { display: flex; gap: 5px; }
+        .life-icon { width: 20px; height: 20px; background: #0f0; border-radius: 50%; }
 
     </style>
 </head>
 <body>
 
     <div id="game-container">
-        <h1>Math Muncher</h1>
-        
-        <div id="hud">
-            <span>Score: <span id="score">0</span></span>
-            <span>Lives: <span id="lives">3</span></span>
-        </div>
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
 
-        <div id="instruction-box">Target: <span id="target-rule">LOADING...</span></div>
-
-        <div id="grid">
+        <div id="ui-layer">
+            <div class="hud-bar">
+                <span id="score-el">Score: 0</span>
+                <span id="rule-el">LOADING...</span>
+                <div class="lives-display" id="lives-el">
+                    <!-- Lives injected here -->
+                </div>
             </div>
-
-        <div id="controls">
-            Use <b>ARROW KEYS</b> to move. Press <b>SPACE</b> to Munch.
+            <div class="hud-bar bottom-bar">
+                ARROWS to Move &nbsp;&bullet;&nbsp; SPACE to Munch &nbsp;&bullet;&nbsp; Avoid Troggles!
+            </div>
         </div>
-    </div>
 
-    <div id="menu">
-        <h1>SELECT MODE</h1>
-        <button onclick="startGame('multiples')">Multiples</button>
-        <button onclick="startGame('factors')">Factors</button>
-    </div>
+        <!-- MAIN MENU -->
+        <div id="menu-screen" class="overlay">
+            <h1>NUMBER MUNCHERS</h1>
+            <p>Help the Muncher eat all the correct numbers. Watch out for the Troggles!</p>
+            <div>
+                <button onclick="Game.init('multiples')">Multiples</button>
+                <button onclick="Game.init('factors')">Factors</button>
+            </div>
+        </div>
 
-    <div id="game-over" class="hidden">
-        <h1>GAME OVER</h1>
-        <p>Final Score: <span id="final-score">0</span></p>
-        <button onclick="location.reload()">Play Again</button>
+        <!-- LEVEL TRANSITION -->
+        <div id="level-screen" class="overlay hidden">
+            <h2 id="level-title">LEVEL 1</h2>
+            <p id="level-rule">Find Multiples of 5</p>
+            <button onclick="Game.startLevel()">START</button>
+        </div>
+
+        <!-- GAME OVER -->
+        <div id="game-over-screen" class="overlay hidden">
+            <h1 style="color:red">GAME OVER</h1>
+            <p>Final Score: <span id="final-score">0</span></p>
+            <button onclick="location.reload()">MAIN MENU</button>
+        </div>
     </div>
 
     <script>
-        // GAME STATE
-        const GRID_W = 6;
-        const GRID_H = 5;
-        let score = 0;
-        let lives = 3;
-        let playerPos = { x: 0, y: 0 };
-        let gridData = []; // Stores numbers and status
-        let currentMode = ''; 
-        let currentTarget = 0;
-        let level = 1;
+        /**
+         * MATH MUNCHER: ARCADE EDITION
+         * A Canvas-based recreation with smooth movement and enemies.
+         */
 
-        // DOM ELEMENTS
-        const gridEl = document.getElementById('grid');
-        const scoreEl = document.getElementById('score');
-        const livesEl = document.getElementById('lives');
-        const ruleEl = document.getElementById('target-rule');
-        const menuEl = document.getElementById('menu');
-        const gameOverEl = document.getElementById('game-over');
-        const finalScoreEl = document.getElementById('final-score');
+        const CANVAS_WIDTH = 800;
+        const CANVAS_HEIGHT = 600;
+        const GRID_COLS = 6;
+        const GRID_ROWS = 5;
+        const TOP_OFFSET = 60; // Space for HUD
+        
+        // Calculated dimensions
+        const CELL_W = CANVAS_WIDTH / GRID_COLS;
+        const CELL_H = (CANVAS_HEIGHT - TOP_OFFSET) / GRID_ROWS;
 
-        // AUDIO CONTEXT (Simple beeps)
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        const audioCtx = new AudioContext();
-
-        function playSound(type) {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Game State
+        const Game = {
+            mode: 'multiples', // or 'factors'
+            level: 1,
+            score: 0,
+            lives: 3,
+            targetNumber: 0,
+            isRunning: false,
+            lastFrameTime: 0,
+            grid: [],
+            enemies: [],
+            particles: [],
             
-            if (type === 'move') {
-                osc.frequency.value = 200;
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.1);
-            } else if (type === 'eat') {
-                osc.frequency.value = 600;
-                osc.type = 'square';
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.15);
-            } else if (type === 'bad') {
-                osc.frequency.value = 100;
-                osc.type = 'sawtooth';
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.3);
-            } else if (type === 'win') {
-                osc.frequency.value = 800;
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.5);
-            }
-        }
+            // Player Object
+            player: {
+                gx: 0, gy: 0, // Grid coordinates
+                x: 0, y: 0,   // Pixel coordinates (for animation)
+                dir: 'right', // Visualization direction
+                mouthOpen: false,
+                mouthTimer: 0,
+                isDead: false
+            },
 
-        // INITIALIZATION
-        function startGame(mode) {
-            currentMode = mode;
-            menuEl.classList.add('hidden');
-            resetLevel();
-        }
+            init: function(mode) {
+                this.mode = mode;
+                this.score = 0;
+                this.lives = 3;
+                this.level = 1;
+                document.getElementById('menu-screen').classList.add('hidden');
+                this.setupLevel();
+            },
 
-        function resetLevel() {
-            // Determine Math Rule
-            if (currentMode === 'multiples') {
-                // Multiples of 2 through 12
-                currentTarget = Math.floor(Math.random() * 11) + 2; 
-                ruleEl.innerText = `Find MULTIPLES of ${currentTarget}`;
-            } else {
-                // Factors of numbers between 10 and 50
-                const easyComposites = [12, 16, 18, 20, 24, 30, 32, 36, 40, 42, 45, 48, 50];
-                currentTarget = easyComposites[Math.floor(Math.random() * easyComposites.length)];
-                ruleEl.innerText = `Find FACTORS of ${currentTarget}`;
-            }
-            
-            generateGrid();
-            renderGrid();
-        }
-
-        function generateGrid() {
-            gridData = [];
-            let correctCount = 0;
-            const totalCells = GRID_W * GRID_H;
-
-            // Generate numbers
-            for (let i = 0; i < totalCells; i++) {
-                let num;
-                let isCorrect = false;
-
-                // 30% chance to generate a correct answer naturally
-                if (Math.random() < 0.3) {
-                    isCorrect = true;
-                }
-
-                if (currentMode === 'multiples') {
-                    if (isCorrect) {
-                        num = currentTarget * (Math.floor(Math.random() * 10) + 1);
-                    } else {
-                        // Generate wrong number (ensure it's NOT a multiple)
-                        do {
-                            num = Math.floor(Math.random() * (currentTarget * 10)) + 1;
-                        } while (num % currentTarget === 0);
-                    }
-                } else { // FACTORS
-                    if (isCorrect) {
-                        // Find actual factors
-                        let factors = [];
-                        for(let k=1; k<=currentTarget; k++) {
-                            if(currentTarget % k === 0) factors.push(k);
-                        }
-                        num = factors[Math.floor(Math.random() * factors.length)];
-                    } else {
-                        // Generate wrong number (ensure it's NOT a factor)
-                        do {
-                            num = Math.floor(Math.random() * currentTarget) + 1;
-                        } while (currentTarget % num === 0);
-                    }
-                }
+            setupLevel: function() {
+                this.isRunning = false;
+                this.player.gx = 0;
+                this.player.gy = 0;
+                this.player.isDead = false;
+                this.enemies = [];
+                this.particles = [];
                 
-                gridData.push({ val: num, eaten: false, isTarget: isCorrect });
-                if (isCorrect) correctCount++;
-            }
-
-            // Ensure at least 3 correct answers exist, otherwise regenerate
-            if (correctCount < 3) generateGrid();
-        }
-
-        function renderGrid() {
-            gridEl.innerHTML = '';
-            gridData.forEach((cell, index) => {
-                const div = document.createElement('div');
-                div.classList.add('cell');
-                div.id = `cell-${index}`;
-                
-                if (cell.eaten) {
-                    div.classList.add('eaten');
+                // Determine Math Rule
+                if (this.mode === 'multiples') {
+                    // Level 1: Multiples of 2. Level 5: Multiples of 9, etc.
+                    this.targetNumber = Math.floor(Math.random() * (2 + this.level)) + 2;
+                    if(this.targetNumber > 12) this.targetNumber = Math.floor(Math.random() * 10) + 2;
                 } else {
-                    div.innerText = cell.val;
+                    const easyComposites = [10, 12, 14, 15, 16, 18, 20, 24, 25, 30, 32, 36, 40, 42, 45, 48, 50];
+                    this.targetNumber = easyComposites[Math.floor(Math.random() * easyComposites.length)];
                 }
 
-                // Check if player is here
-                const px = index % GRID_W;
-                const py = Math.floor(index / GRID_W);
-                if (px === playerPos.x && py === playerPos.y) {
-                    div.classList.add('player');
+                this.generateGrid();
+                this.updateHUD();
+
+                // Show Level Screen
+                const title = this.mode === 'multiples' ? `Multiples of ${this.targetNumber}` : `Factors of ${this.targetNumber}`;
+                document.getElementById('level-title').innerText = `LEVEL ${this.level}`;
+                document.getElementById('level-rule').innerText = `Find: ${title}`;
+                document.getElementById('level-screen').classList.remove('hidden');
+            },
+
+            startLevel: function() {
+                document.getElementById('level-screen').classList.add('hidden');
+                
+                // Reset player pixel pos
+                this.player.x = this.player.gx * CELL_W + (CELL_W/2);
+                this.player.y = this.player.gy * CELL_H + (CELL_H/2) + TOP_OFFSET;
+                
+                this.isRunning = true;
+                this.lastFrameTime = performance.now();
+                requestAnimationFrame(gameLoop);
+
+                // Start Enemy Spawner
+                setTimeout(() => this.spawnEnemy(), 3000); // First enemy after 3s
+            },
+
+            generateGrid: function() {
+                this.grid = [];
+                let validCount = 0;
+                
+                for (let r = 0; r < GRID_ROWS; r++) {
+                    for (let c = 0; c < GRID_COLS; c++) {
+                        let val, isValid;
+                        const isTarget = Math.random() < 0.4; // 40% chance of being a target
+
+                        if (this.mode === 'multiples') {
+                            if (isTarget) {
+                                val = this.targetNumber * (Math.floor(Math.random() * 10) + 1);
+                                isValid = true;
+                            } else {
+                                do {
+                                    val = Math.floor(Math.random() * (this.targetNumber * 10)) + 1;
+                                } while (val % this.targetNumber === 0);
+                                isValid = false;
+                            }
+                        } else {
+                            if (isTarget) {
+                                // Find factors
+                                let factors = [];
+                                for(let i=1; i<=this.targetNumber; i++) {
+                                    if(this.targetNumber % i === 0) factors.push(i);
+                                }
+                                val = factors[Math.floor(Math.random() * factors.length)];
+                                isValid = true;
+                            } else {
+                                do {
+                                    val = Math.floor(Math.random() * this.targetNumber) + 1;
+                                } while (this.targetNumber % val === 0);
+                                isValid = false;
+                            }
+                        }
+
+                        if(isValid) validCount++;
+
+                        this.grid.push({
+                            c: c, r: r,
+                            val: val,
+                            isValid: isValid,
+                            eaten: false,
+                            color: '#0f0' // Text color
+                        });
+                    }
+                }
+                // Ensure at least 3 valid targets
+                if(validCount < 3) this.generateGrid();
+            },
+
+            spawnEnemy: function() {
+                if(!this.isRunning) return;
+
+                // Max enemies scales with level (cap at 4)
+                if(this.enemies.length < Math.min(1 + Math.floor(this.level/2), 4)) {
+                    // Pick a side to spawn from
+                    let gx, gy;
+                    if(Math.random() > 0.5) {
+                        gx = Math.random() > 0.5 ? -1 : GRID_COLS;
+                        gy = Math.floor(Math.random() * GRID_ROWS);
+                    } else {
+                        gx = Math.floor(Math.random() * GRID_COLS);
+                        gy = Math.random() > 0.5 ? -1 : GRID_ROWS;
+                    }
+
+                    // Types: 0 = Wanderer (Red), 1 = Hunter (Purple)
+                    let type = 0; 
+                    if(this.level >= 3 && Math.random() > 0.5) type = 1;
+
+                    this.enemies.push({
+                        gx: gx, gy: gy,
+                        x: gx * CELL_W + (CELL_W/2),
+                        y: gy * CELL_H + (CELL_H/2) + TOP_OFFSET,
+                        type: type,
+                        moveTimer: 0,
+                        moveInterval: type === 1 ? 80 : 120 // Hunters are faster
+                    });
                 }
 
-                gridEl.appendChild(div);
-            });
-        }
+                // Schedule next spawn
+                let nextTime = 3000 + Math.random() * 5000;
+                if(this.level > 2) nextTime -= 1000;
+                setTimeout(() => this.spawnEnemy(), nextTime);
+            },
 
-        // INPUT HANDLING
-        document.addEventListener('keydown', (e) => {
-            if (!menuEl.classList.contains('hidden')) return;
-            if (!gameOverEl.classList.contains('hidden')) return;
+            updateHUD: function() {
+                document.getElementById('score-el').innerText = `Score: ${this.score}`;
+                const ruleText = this.mode === 'multiples' ? `Multiples of ${this.targetNumber}` : `Factors of ${this.targetNumber}`;
+                document.getElementById('rule-el').innerText = ruleText;
+                
+                const livesContainer = document.getElementById('lives-el');
+                livesContainer.innerHTML = '';
+                for(let i=0; i<this.lives; i++) {
+                    const d = document.createElement('div');
+                    d.className = 'life-icon';
+                    livesContainer.appendChild(d);
+                }
+            },
+            
+            loseLife: function() {
+                this.lives--;
+                this.updateHUD();
+                
+                // Screen shake effect
+                canvas.style.transform = 'translate(5px, 5px)';
+                setTimeout(() => canvas.style.transform = 'translate(-5px, -5px)', 50);
+                setTimeout(() => canvas.style.transform = 'translate(0, 0)', 100);
+
+                if (this.lives <= 0) {
+                    this.isRunning = false;
+                    document.getElementById('final-score').innerText = this.score;
+                    document.getElementById('game-over-screen').classList.remove('hidden');
+                } else {
+                    // Respawn player safe
+                    this.player.gx = 0;
+                    this.player.gy = 0;
+                    this.enemies = []; // Clear enemies for fairness
+                }
+            },
+            
+            checkWin: function() {
+                const remaining = this.grid.filter(c => !c.eaten && c.isValid);
+                if (remaining.length === 0) {
+                    this.isRunning = false;
+                    this.level++;
+                    // Bonus points
+                    this.score += 500;
+                    setTimeout(() => {
+                        this.setupLevel();
+                    }, 1000);
+                }
+            }
+        };
+
+        // --- INPUT HANDLING ---
+        window.addEventListener('keydown', e => {
+            if (!Game.isRunning || Game.player.isDead) return;
+
+            const p = Game.player;
+            let didMove = false;
 
             switch(e.key) {
                 case 'ArrowUp': 
-                    if (playerPos.y > 0) playerPos.y--; 
-                    playSound('move');
+                    if (p.gy > 0) { p.gy--; didMove = true; }
                     break;
                 case 'ArrowDown': 
-                    if (playerPos.y < GRID_H - 1) playerPos.y++; 
-                    playSound('move');
+                    if (p.gy < GRID_ROWS - 1) { p.gy++; didMove = true; }
                     break;
                 case 'ArrowLeft': 
-                    if (playerPos.x > 0) playerPos.x--; 
-                    playSound('move');
+                    if (p.gx > 0) { p.gx--; p.dir = 'left'; didMove = true; }
                     break;
                 case 'ArrowRight': 
-                    if (playerPos.x < GRID_W - 1) playerPos.x++; 
-                    playSound('move');
+                    if (p.gx < GRID_COLS - 1) { p.gx++; p.dir = 'right'; didMove = true; }
                     break;
-                case ' ': // Spacebar
-                    attemptMunch();
+                case ' ':
+                    munch();
                     break;
             }
-            renderGrid();
         });
 
-        function attemptMunch() {
-            const index = playerPos.y * GRID_W + playerPos.x;
-            const cell = gridData[index];
+        function munch() {
+            const p = Game.player;
+            const idx = p.gy * GRID_COLS + p.gx;
+            const cell = Game.grid[idx];
 
-            if (cell.eaten) return;
+            p.mouthOpen = true;
+            p.mouthTimer = 10; // Frames to keep mouth open
 
-            if (isCorrectAnswer(cell.val)) {
-                // CORRECT
-                score += 100;
-                scoreEl.innerText = score;
-                cell.eaten = true;
-                playSound('eat');
-                document.getElementById(`cell-${index}`).classList.add('correct-flash');
-                checkWinCondition();
-            } else {
-                // WRONG
-                lives--;
-                livesEl.innerText = lives;
-                playSound('bad');
-                document.getElementById(`cell-${index}`).classList.add('wrong-flash');
-                
-                if (lives <= 0) {
-                    endGame();
+            if (!cell.eaten) {
+                if (cell.isValid) {
+                    // Correct!
+                    cell.eaten = true;
+                    Game.score += 50;
+                    Game.updateHUD();
+                    spawnParticles(p.x, p.y, '#0f0');
+                    Game.checkWin();
+                } else {
+                    // Wrong!
+                    spawnParticles(p.x, p.y, '#f00');
+                    Game.loseLife();
                 }
             }
         }
 
-        function isCorrectAnswer(val) {
-            if (currentMode === 'multiples') {
-                return val % currentTarget === 0;
+        function spawnParticles(x, y, color) {
+            for(let i=0; i<10; i++) {
+                Game.particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    life: 30,
+                    color: color
+                });
+            }
+        }
+
+        // --- GAME LOOP ---
+        function gameLoop(timestamp) {
+            if (!Game.isRunning) return;
+
+            ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            
+            // Draw Grid Lines
+            ctx.strokeStyle = '#004400';
+            ctx.lineWidth = 2;
+            for(let x=0; x<=GRID_COLS; x++) {
+                ctx.beginPath(); ctx.moveTo(x*CELL_W, TOP_OFFSET); ctx.lineTo(x*CELL_W, CANVAS_HEIGHT); ctx.stroke();
+            }
+            for(let y=0; y<=GRID_ROWS; y++) {
+                const Y = y*CELL_H + TOP_OFFSET;
+                ctx.beginPath(); ctx.moveTo(0, Y); ctx.lineTo(CANVAS_WIDTH, Y); ctx.stroke();
+            }
+
+            // Draw Numbers
+            ctx.font = 'bold 24px Courier New';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            Game.grid.forEach(cell => {
+                if (!cell.eaten) {
+                    const cx = cell.c * CELL_W + (CELL_W/2);
+                    const cy = cell.r * CELL_H + (CELL_H/2) + TOP_OFFSET;
+                    ctx.fillStyle = cell.color;
+                    ctx.fillText(cell.val, cx, cy);
+                }
+            });
+
+            // Update & Draw Player
+            const p = Game.player;
+            const targetX = p.gx * CELL_W + (CELL_W/2);
+            const targetY = p.gy * CELL_H + (CELL_H/2) + TOP_OFFSET;
+            
+            // Smooth lerp movement
+            p.x += (targetX - p.x) * 0.2;
+            p.y += (targetY - p.y) * 0.2;
+
+            if (p.mouthTimer > 0) p.mouthTimer--;
+            else p.mouthOpen = false;
+
+            drawMuncher(ctx, p.x, p.y, p.dir, p.mouthOpen);
+
+            // Update & Draw Enemies
+            Game.enemies.forEach(en => {
+                // Movement Logic
+                en.moveTimer++;
+                if (en.moveTimer > en.moveInterval) {
+                    en.moveTimer = 0;
+                    
+                    // Simple AI
+                    let possibleMoves = [];
+                    // Can we move left?
+                    if (en.gx > 0) possibleMoves.push({x:-1, y:0});
+                    if (en.gx < GRID_COLS-1) possibleMoves.push({x:1, y:0});
+                    if (en.gy > 0) possibleMoves.push({x:0, y:-1});
+                    if (en.gy < GRID_ROWS-1) possibleMoves.push({x:0, y:1});
+                    
+                    if (en.type === 1) { // Hunter: Move towards player
+                        // Simple axis alignment
+                        let dx = p.gx - en.gx;
+                        let dy = p.gy - en.gy;
+                        
+                        // Pick best move
+                        let bestMove = possibleMoves[0];
+                        let minDist = 999;
+                        
+                        possibleMoves.forEach(m => {
+                            let dist = Math.abs((en.gx + m.x) - p.gx) + Math.abs((en.gy + m.y) - p.gy);
+                            if (dist < minDist) {
+                                minDist = dist;
+                                bestMove = m;
+                            }
+                        });
+                        
+                        // 20% chance to make a random mistake
+                        if(Math.random() < 0.2) bestMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+
+                        if(bestMove) {
+                            en.gx += bestMove.x;
+                            en.gy += bestMove.y;
+                        }
+                    } else {
+                        // Random Wanderer
+                        const move = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                        if(move) {
+                            en.gx += move.x;
+                            en.gy += move.y;
+                        }
+                    }
+                }
+
+                // Smooth Lerp Enemy
+                const ex = en.gx * CELL_W + (CELL_W/2);
+                const ey = en.gy * CELL_H + (CELL_H/2) + TOP_OFFSET;
+                en.x += (ex - en.x) * 0.1; // Enemies slide slower
+                en.y += (ey - en.y) * 0.1;
+
+                drawTroggle(ctx, en.x, en.y, en.type);
+
+                // Collision Detection (Grid based)
+                if (en.gx === p.gx && en.gy === p.gy) {
+                    Game.loseLife();
+                }
+            });
+
+            // Particles
+            for(let i=Game.particles.length-1; i>=0; i--) {
+                const pt = Game.particles[i];
+                pt.x += pt.vx;
+                pt.y += pt.vy;
+                pt.life--;
+                ctx.fillStyle = pt.color;
+                ctx.fillRect(pt.x, pt.y, 4, 4);
+                if(pt.life <= 0) Game.particles.splice(i, 1);
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- DRAWING HELPERS (CANVAS) ---
+
+        function drawMuncher(ctx, x, y, dir, mouthOpen) {
+            ctx.save();
+            ctx.translate(x, y);
+            if(dir === 'left') ctx.scale(-1, 1);
+            
+            ctx.fillStyle = '#0f0';
+            ctx.beginPath();
+            // Body
+            ctx.arc(0, 0, 25, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Mouth
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            if (mouthOpen) {
+                ctx.moveTo(0, 0);
+                ctx.lineTo(30, -15);
+                ctx.lineTo(30, 15);
             } else {
-                return currentTarget % val === 0;
+                ctx.moveTo(0, 0);
+                ctx.lineTo(25, 0);
             }
+            ctx.fill();
+
+            // Eye
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(5, -10, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
         }
 
-        function checkWinCondition() {
-            // Are there any correct answers left?
-            const remaining = gridData.filter(c => !c.eaten && isCorrectAnswer(c.val));
-            if (remaining.length === 0) {
-                playSound('win');
-                setTimeout(() => {
-                    alert("Level Cleared! Next Round.");
-                    level++;
-                    resetLevel();
-                }, 500);
+        function drawTroggle(ctx, x, y, type) {
+            ctx.save();
+            ctx.translate(x, y);
+            
+            // Wobble animation
+            const wobble = Math.sin(Date.now() / 100) * 3;
+            
+            ctx.fillStyle = type === 0 ? '#ff4444' : '#aa00aa'; // Red or Purple
+            
+            // Body shape
+            ctx.beginPath();
+            ctx.moveTo(-20, 20);
+            ctx.lineTo(-20 + wobble, -10);
+            ctx.bezierCurveTo(-10, -30, 10, -30, 20 + wobble, -10);
+            ctx.lineTo(20, 20);
+            
+            // Little feet/jagged bottom
+            for(let i=20; i>=-20; i-=10) {
+                ctx.lineTo(i-5, 15);
+                ctx.lineTo(i-10, 20);
             }
-        }
+            ctx.fill();
 
-        function endGame() {
-            finalScoreEl.innerText = score;
-            gameOverEl.classList.remove('hidden');
+            // Eyes
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(-8, -5, 6, 0, Math.PI*2);
+            ctx.arc(8, -5, 6, 0, Math.PI*2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(-8 + (Math.random()*2-1), -5, 2, 0, Math.PI*2);
+            ctx.arc(8 + (Math.random()*2-1), -5, 2, 0, Math.PI*2);
+            ctx.fill();
+
+            ctx.restore();
         }
 
     </script>
