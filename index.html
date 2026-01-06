@@ -145,8 +145,31 @@
     <script>
         /**
          * MATH MUNCHER: ARCADE EDITION
-         * A Canvas-based recreation with smooth movement and enemies.
+         * * --- TEACHER SETTINGS ---
+         * You can adjust the difficulty and numbers here.
          */
+        
+        const TEACHER_SETTINGS = {
+            STARTING_LIVES: 3,
+            
+            // MULTIPLES MODE:
+            // "Easy" is used for Levels 1-2.
+            // "Hard" is added to the mix for Level 3+.
+            MULTIPLES_EASY: [2, 5, 10], 
+            MULTIPLES_HARD: [3, 4, 6, 7, 8, 9, 11, 12],
+            
+            // FACTORS MODE:
+            // "Easy" numbers (Levels 1-2) have obvious factors.
+            // "Hard" numbers (Level 3+) are larger composites.
+            FACTORS_EASY: [10, 12, 15, 16, 20, 24, 25],
+            FACTORS_HARD: [18, 28, 30, 32, 36, 40, 42, 45, 48, 50, 56, 60, 64, 72, 80],
+
+            // How many correct answers must be on the board minimum?
+            MIN_CORRECT_ANSWERS: 3
+        };
+
+
+        /* --- GAME ENGINE (Do not edit below unless comfortable with JS) --- */
 
         const CANVAS_WIDTH = 800;
         const CANVAS_HEIGHT = 600;
@@ -168,48 +191,67 @@
             score: 0,
             lives: 3,
             targetNumber: 0,
-            isRunning: false,
+            
+            // State Machine: 'menu', 'playing', 'dying', 'gameover'
+            state: 'menu', 
+            
             lastFrameTime: 0,
             grid: [],
             enemies: [],
             particles: [],
             
+            // Animation variables
+            deathTimer: 0,
+            deathDuration: 60, // Frames (approx 1 sec)
+            
             // Player Object
             player: {
                 gx: 0, gy: 0, // Grid coordinates
-                x: 0, y: 0,   // Pixel coordinates (for animation)
-                dir: 'right', // Visualization direction
+                x: 0, y: 0,   // Pixel coordinates
+                dir: 'right', 
                 mouthOpen: false,
                 mouthTimer: 0,
-                isDead: false
+                angle: 0,      // For death spin
+                scale: 1       // For death shrink
             },
 
             init: function(mode) {
                 this.mode = mode;
                 this.score = 0;
-                this.lives = 3;
+                this.lives = TEACHER_SETTINGS.STARTING_LIVES;
                 this.level = 1;
                 document.getElementById('menu-screen').classList.add('hidden');
                 this.setupLevel();
             },
 
             setupLevel: function() {
-                this.isRunning = false;
+                this.state = 'playing';
                 this.player.gx = 0;
                 this.player.gy = 0;
-                this.player.isDead = false;
+                this.player.angle = 0;
+                this.player.scale = 1;
+                
                 this.enemies = [];
                 this.particles = [];
                 
-                // Determine Math Rule
+                // --- PROGRESSION LOGIC ---
+                let pool = [];
                 if (this.mode === 'multiples') {
-                    // Level 1: Multiples of 2. Level 5: Multiples of 9, etc.
-                    this.targetNumber = Math.floor(Math.random() * (2 + this.level)) + 2;
-                    if(this.targetNumber > 12) this.targetNumber = Math.floor(Math.random() * 10) + 2;
+                    if (this.level <= 2) {
+                        pool = TEACHER_SETTINGS.MULTIPLES_EASY;
+                    } else {
+                        pool = [...TEACHER_SETTINGS.MULTIPLES_EASY, ...TEACHER_SETTINGS.MULTIPLES_HARD];
+                    }
                 } else {
-                    const easyComposites = [10, 12, 14, 15, 16, 18, 20, 24, 25, 30, 32, 36, 40, 42, 45, 48, 50];
-                    this.targetNumber = easyComposites[Math.floor(Math.random() * easyComposites.length)];
+                    if (this.level <= 2) {
+                        pool = TEACHER_SETTINGS.FACTORS_EASY;
+                    } else {
+                        pool = [...TEACHER_SETTINGS.FACTORS_EASY, ...TEACHER_SETTINGS.FACTORS_HARD];
+                    }
                 }
+                
+                // Pick random number from the determined pool
+                this.targetNumber = pool[Math.floor(Math.random() * pool.length)];
 
                 this.generateGrid();
                 this.updateHUD();
@@ -228,12 +270,13 @@
                 this.player.x = this.player.gx * CELL_W + (CELL_W/2);
                 this.player.y = this.player.gy * CELL_H + (CELL_H/2) + TOP_OFFSET;
                 
-                this.isRunning = true;
                 this.lastFrameTime = performance.now();
+                
+                // Start Loop if not already running
                 requestAnimationFrame(gameLoop);
 
                 // Start Enemy Spawner
-                setTimeout(() => this.spawnEnemy(), 3000); // First enemy after 3s
+                setTimeout(() => this.spawnEnemy(), 3000); 
             },
 
             generateGrid: function() {
@@ -243,7 +286,7 @@
                 for (let r = 0; r < GRID_ROWS; r++) {
                     for (let c = 0; c < GRID_COLS; c++) {
                         let val, isValid;
-                        const isTarget = Math.random() < 0.4; // 40% chance of being a target
+                        const isTarget = Math.random() < 0.4; 
 
                         if (this.mode === 'multiples') {
                             if (isTarget) {
@@ -257,7 +300,6 @@
                             }
                         } else {
                             if (isTarget) {
-                                // Find factors
                                 let factors = [];
                                 for(let i=1; i<=this.targetNumber; i++) {
                                     if(this.targetNumber % i === 0) factors.push(i);
@@ -279,20 +321,21 @@
                             val: val,
                             isValid: isValid,
                             eaten: false,
-                            color: '#0f0' // Text color
+                            color: '#0f0',
+                            highlightTimer: 0
                         });
                     }
                 }
-                // Ensure at least 3 valid targets
-                if(validCount < 3) this.generateGrid();
+                if(validCount < TEACHER_SETTINGS.MIN_CORRECT_ANSWERS) this.generateGrid();
             },
 
             spawnEnemy: function() {
-                if(!this.isRunning) return;
+                if(this.state !== 'playing') return;
 
-                // Max enemies scales with level (cap at 4)
-                if(this.enemies.length < Math.min(1 + Math.floor(this.level/2), 4)) {
-                    // Pick a side to spawn from
+                // Max enemies scales with level
+                let maxEnemies = Math.min(1 + Math.floor(this.level/2), 4);
+                
+                if(this.enemies.length < maxEnemies) {
                     let gx, gy;
                     if(Math.random() > 0.5) {
                         gx = Math.random() > 0.5 ? -1 : GRID_COLS;
@@ -312,11 +355,10 @@
                         y: gy * CELL_H + (CELL_H/2) + TOP_OFFSET,
                         type: type,
                         moveTimer: 0,
-                        moveInterval: type === 1 ? 80 : 120 // Hunters are faster
+                        moveInterval: type === 1 ? 80 : 120 
                     });
                 }
 
-                // Schedule next spawn
                 let nextTime = 3000 + Math.random() * 5000;
                 if(this.level > 2) nextTime -= 1000;
                 setTimeout(() => this.spawnEnemy(), nextTime);
@@ -336,23 +378,34 @@
                 }
             },
             
-            loseLife: function() {
+            triggerDeath: function() {
+                if (this.state === 'dying') return;
+                
+                this.state = 'dying';
+                this.deathTimer = this.deathDuration;
+                
+                // Spawn red particles at player location
+                spawnParticles(this.player.x, this.player.y, '#f00', 20);
+            },
+
+            resolveDeath: function() {
                 this.lives--;
                 this.updateHUD();
-                
-                // Screen shake effect
-                canvas.style.transform = 'translate(5px, 5px)';
-                setTimeout(() => canvas.style.transform = 'translate(-5px, -5px)', 50);
-                setTimeout(() => canvas.style.transform = 'translate(0, 0)', 100);
 
                 if (this.lives <= 0) {
-                    this.isRunning = false;
+                    this.state = 'gameover';
                     document.getElementById('final-score').innerText = this.score;
                     document.getElementById('game-over-screen').classList.remove('hidden');
                 } else {
-                    // Respawn player safe
+                    // Respawn
+                    this.state = 'playing';
                     this.player.gx = 0;
                     this.player.gy = 0;
+                    this.player.angle = 0;
+                    this.player.scale = 1;
+                    this.player.x = this.player.gx * CELL_W + (CELL_W/2);
+                    this.player.y = this.player.gy * CELL_H + (CELL_H/2) + TOP_OFFSET;
+                    
                     this.enemies = []; // Clear enemies for fairness
                 }
             },
@@ -360,30 +413,28 @@
             checkWin: function() {
                 const remaining = this.grid.filter(c => !c.eaten && c.isValid);
                 if (remaining.length === 0) {
-                    this.isRunning = false;
                     this.level++;
-                    // Bonus points
                     this.score += 500;
+                    // Small delay before next level
                     setTimeout(() => {
                         this.setupLevel();
-                    }, 1000);
+                    }, 500);
                 }
             },
 
             hint: function() {
-                // Find all valid, uneaten cells
+                if(this.state !== 'playing') return;
                 const targets = this.grid.filter(c => c.isValid && !c.eaten);
                 if (targets.length > 0) {
-                    // Pick random one to flash
                     const t = targets[Math.floor(Math.random() * targets.length)];
-                    t.highlightTimer = 60; // Flash for ~1 second (60 frames)
+                    t.highlightTimer = 60; 
                 }
             }
         };
 
         // --- INPUT HANDLING ---
         window.addEventListener('keydown', e => {
-            if (!Game.isRunning || Game.player.isDead) return;
+            if (Game.state !== 'playing') return;
 
             const p = Game.player;
             let didMove = false;
@@ -417,7 +468,7 @@
             const cell = Game.grid[idx];
 
             p.mouthOpen = true;
-            p.mouthTimer = 10; // Frames to keep mouth open
+            p.mouthTimer = 10; 
 
             if (!cell.eaten) {
                 if (cell.isValid) {
@@ -425,23 +476,22 @@
                     cell.eaten = true;
                     Game.score += 50;
                     Game.updateHUD();
-                    spawnParticles(p.x, p.y, '#0f0');
+                    spawnParticles(p.x, p.y, '#0f0', 10);
                     Game.checkWin();
                 } else {
                     // Wrong!
-                    spawnParticles(p.x, p.y, '#f00');
-                    Game.loseLife();
+                    Game.triggerDeath();
                 }
             }
         }
 
-        function spawnParticles(x, y, color) {
-            for(let i=0; i<10; i++) {
+        function spawnParticles(x, y, color, count) {
+            for(let i=0; i<count; i++) {
                 Game.particles.push({
                     x: x, y: y,
-                    vx: (Math.random() - 0.5) * 10,
-                    vy: (Math.random() - 0.5) * 10,
-                    life: 30,
+                    vx: (Math.random() - 0.5) * 12,
+                    vy: (Math.random() - 0.5) * 12,
+                    life: 40,
                     color: color
                 });
             }
@@ -449,7 +499,7 @@
 
         // --- GAME LOOP ---
         function gameLoop(timestamp) {
-            if (!Game.isRunning) return;
+            if (Game.state === 'gameover') return; // Stop loop on game over
 
             ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
             
@@ -475,101 +525,41 @@
                     const cy = cell.r * CELL_H + (CELL_H/2) + TOP_OFFSET;
                     
                     if (cell.highlightTimer > 0) {
-                        // Flash effect
                         ctx.save();
                         ctx.fillStyle = '#fff';
-                        ctx.globalAlpha = 0.3; // Semi-transparent white box
+                        ctx.globalAlpha = 0.3; 
                         ctx.fillRect(cell.c * CELL_W, cell.r * CELL_H + TOP_OFFSET, CELL_W, CELL_H);
                         ctx.restore();
-                        
                         cell.highlightTimer--;
-                        ctx.fillStyle = '#fff'; // Text becomes bright white
+                        ctx.fillStyle = '#fff'; 
                     } else {
                         ctx.fillStyle = cell.color;
                     }
-                    
                     ctx.fillText(cell.val, cx, cy);
                 }
             });
 
-            // Update & Draw Player
-            const p = Game.player;
-            const targetX = p.gx * CELL_W + (CELL_W/2);
-            const targetY = p.gy * CELL_H + (CELL_H/2) + TOP_OFFSET;
-            
-            // Smooth lerp movement
-            p.x += (targetX - p.x) * 0.2;
-            p.y += (targetY - p.y) * 0.2;
+            // LOGIC SPLIT: PLAYING vs DYING
+            if (Game.state === 'playing') {
+                updatePlayingState();
+            } else if (Game.state === 'dying') {
+                updateDyingState();
+            }
 
-            if (p.mouthTimer > 0) p.mouthTimer--;
-            else p.mouthOpen = false;
-
-            drawMuncher(ctx, p.x, p.y, p.dir, p.mouthOpen);
-
-            // Update & Draw Enemies
+            // Always Draw Enemies (even if paused/dying, keep them on screen)
             Game.enemies.forEach(en => {
-                // Movement Logic
-                en.moveTimer++;
-                if (en.moveTimer > en.moveInterval) {
-                    en.moveTimer = 0;
-                    
-                    // Simple AI
-                    let possibleMoves = [];
-                    // Can we move left?
-                    if (en.gx > 0) possibleMoves.push({x:-1, y:0});
-                    if (en.gx < GRID_COLS-1) possibleMoves.push({x:1, y:0});
-                    if (en.gy > 0) possibleMoves.push({x:0, y:-1});
-                    if (en.gy < GRID_ROWS-1) possibleMoves.push({x:0, y:1});
-                    
-                    if (en.type === 1) { // Hunter: Move towards player
-                        // Simple axis alignment
-                        let dx = p.gx - en.gx;
-                        let dy = p.gy - en.gy;
-                        
-                        // Pick best move
-                        let bestMove = possibleMoves[0];
-                        let minDist = 999;
-                        
-                        possibleMoves.forEach(m => {
-                            let dist = Math.abs((en.gx + m.x) - p.gx) + Math.abs((en.gy + m.y) - p.gy);
-                            if (dist < minDist) {
-                                minDist = dist;
-                                bestMove = m;
-                            }
-                        });
-                        
-                        // 20% chance to make a random mistake
-                        if(Math.random() < 0.2) bestMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-
-                        if(bestMove) {
-                            en.gx += bestMove.x;
-                            en.gy += bestMove.y;
-                        }
-                    } else {
-                        // Random Wanderer
-                        const move = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-                        if(move) {
-                            en.gx += move.x;
-                            en.gy += move.y;
-                        }
-                    }
-                }
-
-                // Smooth Lerp Enemy
                 const ex = en.gx * CELL_W + (CELL_W/2);
                 const ey = en.gy * CELL_H + (CELL_H/2) + TOP_OFFSET;
-                en.x += (ex - en.x) * 0.1; // Enemies slide slower
-                en.y += (ey - en.y) * 0.1;
-
-                drawTroggle(ctx, en.x, en.y, en.type);
-
-                // Collision Detection (Grid based)
-                if (en.gx === p.gx && en.gy === p.gy) {
-                    Game.loseLife();
+                
+                // Only interpolate movement if playing
+                if (Game.state === 'playing') {
+                    en.x += (ex - en.x) * 0.1;
+                    en.y += (ey - en.y) * 0.1;
                 }
+                drawTroggle(ctx, en.x, en.y, en.type);
             });
 
-            // Particles
+            // Always Draw Particles
             for(let i=Game.particles.length-1; i>=0; i--) {
                 const pt = Game.particles[i];
                 pt.x += pt.vx;
@@ -583,16 +573,82 @@
             requestAnimationFrame(gameLoop);
         }
 
-        // --- DRAWING HELPERS (CANVAS) ---
+        function updatePlayingState() {
+            const p = Game.player;
+            const targetX = p.gx * CELL_W + (CELL_W/2);
+            const targetY = p.gy * CELL_H + (CELL_H/2) + TOP_OFFSET;
+            
+            p.x += (targetX - p.x) * 0.2;
+            p.y += (targetY - p.y) * 0.2;
 
-        function drawMuncher(ctx, x, y, dir, mouthOpen) {
+            if (p.mouthTimer > 0) p.mouthTimer--;
+            else p.mouthOpen = false;
+
+            drawMuncher(ctx, p.x, p.y, p.dir, p.mouthOpen, 0, 1);
+
+            // Update Enemies
+            Game.enemies.forEach(en => {
+                en.moveTimer++;
+                if (en.moveTimer > en.moveInterval) {
+                    en.moveTimer = 0;
+                    
+                    let possibleMoves = [];
+                    if (en.gx > 0) possibleMoves.push({x:-1, y:0});
+                    if (en.gx < GRID_COLS-1) possibleMoves.push({x:1, y:0});
+                    if (en.gy > 0) possibleMoves.push({x:0, y:-1});
+                    if (en.gy < GRID_ROWS-1) possibleMoves.push({x:0, y:1});
+                    
+                    if (en.type === 1) { // Hunter
+                        let bestMove = possibleMoves[0];
+                        let minDist = 999;
+                        possibleMoves.forEach(m => {
+                            let dist = Math.abs((en.gx + m.x) - p.gx) + Math.abs((en.gy + m.y) - p.gy);
+                            if (dist < minDist) { minDist = dist; bestMove = m; }
+                        });
+                        if(Math.random() < 0.2) bestMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                        if(bestMove) { en.gx += bestMove.x; en.gy += bestMove.y; }
+                    } else { // Wanderer
+                        const move = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                        if(move) { en.gx += move.x; en.gy += move.y; }
+                    }
+                }
+                
+                // Collision
+                if (en.gx === p.gx && en.gy === p.gy) {
+                    Game.triggerDeath();
+                }
+            });
+        }
+
+        function updateDyingState() {
+            // Animate Player Death
+            Game.deathTimer--;
+            const p = Game.player;
+            
+            // Spin and shrink effect
+            p.angle += 0.4; 
+            p.scale -= 1 / Game.deathDuration;
+            if(p.scale < 0) p.scale = 0;
+
+            drawMuncher(ctx, p.x, p.y, p.dir, true, p.angle, p.scale);
+
+            if (Game.deathTimer <= 0) {
+                Game.resolveDeath();
+            }
+        }
+
+        // --- DRAWING HELPERS ---
+
+        function drawMuncher(ctx, x, y, dir, mouthOpen, angle, scale) {
             ctx.save();
             ctx.translate(x, y);
+            ctx.rotate(angle);
+            ctx.scale(scale, scale);
+            
             if(dir === 'left') ctx.scale(-1, 1);
             
             ctx.fillStyle = '#0f0';
             ctx.beginPath();
-            // Body
             ctx.arc(0, 0, 25, 0, Math.PI * 2);
             ctx.fill();
             
@@ -622,26 +678,22 @@
             ctx.save();
             ctx.translate(x, y);
             
-            // Wobble animation
             const wobble = Math.sin(Date.now() / 100) * 3;
             
-            ctx.fillStyle = type === 0 ? '#ff4444' : '#aa00aa'; // Red or Purple
+            ctx.fillStyle = type === 0 ? '#ff4444' : '#aa00aa'; 
             
-            // Body shape
             ctx.beginPath();
             ctx.moveTo(-20, 20);
             ctx.lineTo(-20 + wobble, -10);
             ctx.bezierCurveTo(-10, -30, 10, -30, 20 + wobble, -10);
             ctx.lineTo(20, 20);
             
-            // Little feet/jagged bottom
             for(let i=20; i>=-20; i-=10) {
                 ctx.lineTo(i-5, 15);
                 ctx.lineTo(i-10, 20);
             }
             ctx.fill();
 
-            // Eyes
             ctx.fillStyle = '#fff';
             ctx.beginPath();
             ctx.arc(-8, -5, 6, 0, Math.PI*2);
