@@ -165,7 +165,12 @@
             FACTORS_HARD: [18, 28, 30, 32, 36, 40, 42, 45, 48, 50, 56, 60, 64, 72, 80],
 
             // How many correct answers must be on the board minimum?
-            MIN_CORRECT_ANSWERS: 3
+            MIN_CORRECT_ANSWERS: 3,
+
+            // TROGGLE SPEEDS (Frames per move. 60 frames = approx 1 second)
+            // Higher number = SLOWER enemy. Lower number = FASTER enemy.
+            SPEED_RED_TROGGLE: 120,   // Wanderer (Easy)
+            SPEED_PURPLE_TROGGLE: 100 // Hunter (Hard) - Was 80, increased to 100 to slow it down
         };
 
 
@@ -355,7 +360,7 @@
                         y: gy * CELL_H + (CELL_H/2) + TOP_OFFSET,
                         type: type,
                         moveTimer: 0,
-                        moveInterval: type === 1 ? 80 : 120 
+                        moveInterval: type === 1 ? TEACHER_SETTINGS.SPEED_PURPLE_TROGGLE : TEACHER_SETTINGS.SPEED_RED_TROGGLE 
                     });
                 }
 
