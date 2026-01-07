@@ -47,6 +47,7 @@
             padding: 10px;
             display: flex;
             justify-content: space-between;
+            align-items: center;
             font-size: 20px;
             font-weight: bold;
             border-bottom: 2px solid #0f0;
@@ -94,8 +95,15 @@
         }
         button:hover { background: #0f0; color: #000; box-shadow: 0 0 15px #0f0; }
 
+        .status-container {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+        }
         .lives-display { display: flex; gap: 5px; }
-        .life-icon { width: 20px; height: 20px; background: #0f0; border-radius: 50%; }
+        .life-icon { width: 20px; height: 20px; background: #0f0; border-radius: 50%; box-shadow: 0 0 5px #0f0; }
+        .hint-icon { width: 20px; height: 20px; background: #0ff; border-radius: 2px; box-shadow: 0 0 5px #0ff; }
 
     </style>
 </head>
@@ -108,8 +116,9 @@
             <div class="hud-bar">
                 <span id="score-el">Score: 0</span>
                 <span id="rule-el">LOADING...</span>
-                <div class="lives-display" id="lives-el">
-                    <!-- Lives injected here -->
+                <div class="status-container">
+                    <div class="lives-display" id="lives-el" title="Lives"></div>
+                    <div class="lives-display" id="hints-el" title="Hints (Cyan)"></div>
                 </div>
             </div>
             <div class="hud-bar bottom-bar">
@@ -151,6 +160,7 @@
         
         const TEACHER_SETTINGS = {
             STARTING_LIVES: 4,
+            STARTING_HINTS: 3, // Hints per level
             
             // MULTIPLES MODE:
             // "Easy" is used for Levels 1-2.
@@ -180,7 +190,7 @@
         const CANVAS_HEIGHT = 600;
         const GRID_COLS = 6;
         const GRID_ROWS = 5;
-        const TOP_OFFSET = 60; // Space for HUD
+        const TOP_OFFSET = 70; // Increased slightly for taller HUD
         
         // Calculated dimensions
         const CELL_W = CANVAS_WIDTH / GRID_COLS;
@@ -195,6 +205,7 @@
             level: 1,
             score: 0,
             lives: 3,
+            hints: 3,
             targetNumber: 0,
             
             // State Machine: 'menu', 'playing', 'dying', 'gameover'
@@ -235,6 +246,9 @@
                 this.player.gy = 0;
                 this.player.angle = 0;
                 this.player.scale = 1;
+                
+                // Reset hints for the level
+                this.hints = TEACHER_SETTINGS.STARTING_HINTS;
                 
                 this.enemies = [];
                 this.particles = [];
@@ -374,12 +388,22 @@
                 const ruleText = this.mode === 'multiples' ? `Multiples of ${this.targetNumber}` : `Factors of ${this.targetNumber}`;
                 document.getElementById('rule-el').innerText = ruleText;
                 
+                // Update Lives
                 const livesContainer = document.getElementById('lives-el');
                 livesContainer.innerHTML = '';
                 for(let i=0; i<this.lives; i++) {
                     const d = document.createElement('div');
                     d.className = 'life-icon';
                     livesContainer.appendChild(d);
+                }
+
+                // Update Hints
+                const hintsContainer = document.getElementById('hints-el');
+                hintsContainer.innerHTML = '';
+                for(let i=0; i<this.hints; i++) {
+                    const d = document.createElement('div');
+                    d.className = 'hint-icon';
+                    hintsContainer.appendChild(d);
                 }
             },
             
@@ -429,8 +453,15 @@
 
             hint: function() {
                 if(this.state !== 'playing') return;
+                
+                // Check if hints available
+                if (this.hints <= 0) return;
+
                 const targets = this.grid.filter(c => c.isValid && !c.eaten);
                 if (targets.length > 0) {
+                    this.hints--; // Decrement Hint
+                    this.updateHUD(); // Update Visuals
+                    
                     const t = targets[Math.floor(Math.random() * targets.length)];
                     t.highlightTimer = 60; 
                 }
